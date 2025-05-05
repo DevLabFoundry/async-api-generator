@@ -106,12 +106,12 @@ gendoc global-context --input local:///path/to/src/domain.sample --output local:
 
 ### Local Example
 
-Point it to an input directory of any repo - e.g. `domain.Packing.DirectDespatchAggregation`.
+Point it to an input directory of any repo - e.g. `domain.Foo.BarActionQux`.
 
 This will generate the interim code that the 
 
 ```sh
-gendoc single-context --input local://$FULL_PATH_TO/domain.Packing.DirectDespatchAggregation --is-service --bounded-ctx Packing --business-domain domain \
+gendoc single-context --input local://$FULL_PATH_TO/domain.Foo.BarActionQux --is-service --bounded-ctx Foo --business-domain domain \
 --repo "https://github.com/repo" \
 --output local://$HOME/.gendoc/poc
 ```
@@ -124,4 +124,4 @@ This is then used as in input for the global-context and it will output a full A
 gendoc global-context --input local://$HOME/.gendoc/poc/current --output local://$HOME/.gendoc/poc/processed
 ```
 
-The files are emitted with the `AsyncAPI.ID` as the name in the `asyncapi` directory, e.g.: `asyncapi/urn:domain:Packing:domain.Packing.DirectDespatchAggregation.yml`.
+The files are emitted with the `AsyncAPI.ID` as the name in the `asyncapi` directory, e.g.: `asyncapi/urn:domain:Foo:domain.Foo.BarActionQux.yml`.
