@@ -2,6 +2,7 @@ package asyncapigendoc_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -13,12 +14,12 @@ func Test_root_ok(t *testing.T) {
 	baseDir := "test/foo.sample"
 	b := new(bytes.Buffer)
 
-	cmd := asyncapigendoc.AsyncAPIGenCmd
-
+	cmd := asyncapigendoc.NewCmd(context.TODO())
+	cmd.WithCommands()
 	fshelper.DebugDirHelper(t, baseDir, "cmd/async-api-gen-doc", "../../")
 
-	cmd.SetArgs([]string{"--version"})
-	cmd.SetErr(b)
+	cmd.Cmd.SetArgs([]string{"--version"})
+	cmd.Cmd.SetErr(b)
 	cmd.Execute()
 	out, err := io.ReadAll(b)
 	if err != nil {

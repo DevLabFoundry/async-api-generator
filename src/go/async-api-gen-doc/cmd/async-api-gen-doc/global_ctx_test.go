@@ -2,6 +2,7 @@ package asyncapigendoc_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -18,15 +19,16 @@ func Test_global_Analyis_runs_ok(t *testing.T) {
 	t.Run("azblob source and output", func(t *testing.T) {
 		t.Skip()
 
-		cmd := asyncapigendoc.AsyncAPIGenCmd
+		cmd := asyncapigendoc.NewCmd(context.TODO())
+		cmd.WithCommands()
 
 		b := new(bytes.Buffer)
 
-		cmd.SetArgs([]string{"global-context", "-i",
+		cmd.Cmd.SetArgs([]string{"global-context", "-i",
 			"azblob://stdevsandboxeuwdev/interim/current",
 			"--output", "azblob://stdevsandboxeuwdev/processed"})
 
-		cmd.SetErr(b)
+		cmd.Cmd.SetErr(b)
 		cmd.Execute()
 		out, err := io.ReadAll(b)
 		if err != nil {
@@ -46,18 +48,19 @@ func Test_global_Analyis_runs_ok(t *testing.T) {
 		}
 		defer os.RemoveAll(out)
 
-		cmd := asyncapigendoc.AsyncAPIGenCmd
+		cmd := asyncapigendoc.NewCmd(context.TODO())
+		cmd.WithCommands()
 
 		baseDir := "test/interim-generated"
 
 		b := new(bytes.Buffer)
 		output := fmt.Sprintf("local://%s", out)
-		cmd.SetArgs([]string{"global-context", "-i",
+		cmd.Cmd.SetArgs([]string{"global-context", "-i",
 			fmt.Sprintf("local://%s", fshelper.DebugDirHelper(t, baseDir, "cmd/async-api-gen-doc", "../../")),
 			"--verbose",
 			"--output", output})
 
-		cmd.SetErr(b)
+		cmd.Cmd.SetErr(b)
 		cmd.Execute()
 
 		rb, err := io.ReadAll(b)

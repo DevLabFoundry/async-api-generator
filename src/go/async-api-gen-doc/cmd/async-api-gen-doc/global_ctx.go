@@ -11,66 +11,61 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	globalCtxCmd = &cobra.Command{
+func globalCtxCmd(rootCmd *AsyncApiGenDocCmd) {
+
+	cmd := &cobra.Command{
 		Use:     "global-context",
 		Aliases: []string{"gc", "global"},
 		Short:   `Runs the gendoc against a directory containing processed GenDocBlox.`,
 		Long: `Runs the gendoc against a directory containing processed GenDocBlox. Builds a hierarchical tree with the generated interim states across multiple contexts. 
-		Source must be specified [see output] option for examples and structure`,
-		RunE: globalCtxExecute,
+Source must be specified [see output] option for examples and structure`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if rootCmd.rootFlags.verbose {
+				rootCmd.logger = log.New(os.Stdout, log.DebugLvl)
+			}
+
+			conf, cleanUp, err := rootCmd.config(rootCmd.inputLocationStorageConfig, &genDocContextFlags{})
+			if err != nil {
+				return err
+			}
+			defer cleanUp()
+			rootCmd.logger.Debugf("interim output: %s", conf.InterimOutputDir)
+			rootCmd.logger.Debugf("download output: %s", conf.DownloadDir)
+
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			if err := fetchPrep(ctx, conf, rootCmd.inputLocationStorageConfig); err != nil {
+				return err
+			}
+
+			files, err := fshelper.ListFiles(conf.DownloadDir)
+			if err != nil {
+				return err
+			}
+
+			g := generate.New(conf, rootCmd.logger)
+
+			g.LoadInputsFromFiles(files)
+
+			if err := g.ConvertProcessed(); err != nil {
+				return err
+			}
+
+			if err := g.BuildContextTree(); err != nil {
+				return err
+			}
+
+			if err := g.AsyncAPIFromProcessedTree(); err != nil {
+				return err
+			}
+			return uploadPrep(ctx, g, rootCmd.outputStorageConfig)
+		},
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return setStorageLocation(inputLocation, outputLocation)
+			return rootCmd.setStorageLocation(rootCmd.rootFlags.inputLocation, rootCmd.rootFlags.outputLocation)
 		},
 	}
-)
-
-func init() {
-	AsyncAPIGenCmd.AddCommand(globalCtxCmd)
-}
-
-func globalCtxExecute(cmd *cobra.Command, args []string) error {
-
-	if verbose {
-		logger = log.New(os.Stdout, log.DebugLvl)
-	}
-
-	conf, cleanUp, err := config(inputLocationStorageConfig)
-	if err != nil {
-		return err
-	}
-	defer cleanUp()
-	logger.Debugf("interim output: %s", conf.InterimOutputDir)
-	logger.Debugf("download output: %s", conf.DownloadDir)
-
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
-	if err := fetchPrep(ctx, conf, inputLocationStorageConfig); err != nil {
-		return err
-	}
-
-	files, err := fshelper.ListFiles(conf.DownloadDir)
-	if err != nil {
-		return err
-	}
-
-	g := generate.New(conf, logger)
-
-	g.LoadInputsFromFiles(files)
-
-	if err := g.ConvertProcessed(); err != nil {
-		return err
-	}
-
-	if err := g.BuildContextTree(); err != nil {
-		return err
-	}
-
-	if err := g.AsyncAPIFromProcessedTree(); err != nil {
-		return err
-	}
-	return uploadPrep(ctx, g, outputStorageConfig)
+	rootCmd.Cmd.AddCommand(cmd)
 }
 
 // fetchPrep
@@ -81,7 +76,11 @@ func fetchPrep(ctx context.Context, conf *generate.Config, storageConf *storage.
 		return err
 	}
 
-	fetchReq := &storage.StorageFetchRequest{Destination: storageConf.Destination, ContainerName: storageConf.TopLevelFolder, EmitPath: conf.DownloadDir}
+	fetchReq := &storage.StorageFetchRequest{
+		Destination:   storageConf.Destination,
+		ContainerName: storageConf.TopLevelFolder,
+		EmitPath:      conf.DownloadDir,
+	}
 
 	if err := sc.Fetch(ctx, fetchReq); err != nil {
 		return err

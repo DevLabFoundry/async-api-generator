@@ -13,78 +13,81 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
+type genDocContextFlags struct {
 	businessDomain   string
 	boundedCtxDomain string
 	repoUrl          string
 	repoLang         string
 	isService        bool
 	serviceId        string
-	singleCtxCmd     = &cobra.Command{
+}
+
+func singleContextCmd(rootCmd *AsyncApiGenDocCmd) {
+	f := &genDocContextFlags{}
+	singleCtxCmd := &cobra.Command{
 		Use:     "single-context",
 		Aliases: []string{"sc", "single"},
 		Short:   `Runs the gendoc against a single repo source`,
 		Long:    `Runs the gendoc against a single repo source and emits the output to specified storage.`,
-		RunE:    singleCtxExecute,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if rootCmd.rootFlags.verbose {
+				rootCmd.logger = log.New(os.Stdout, log.DebugLvl)
+			}
+
+			conf, cleanUp, err := rootCmd.config(rootCmd.inputLocationStorageConfig, f)
+			if err != nil {
+				return err
+			}
+
+			defer cleanUp()
+
+			files, err := fshelper.ListFiles(rootCmd.inputLocationStorageConfig.Destination)
+			if err != nil {
+				return err
+			}
+
+			gendoc := generate.New(conf, rootCmd.logger)
+
+			gendoc.LoadInputsFromFiles(files)
+
+			if err := gendoc.GenDocBlox(); err != nil {
+				return err
+			}
+
+			if rootCmd.rootFlags.dryRun {
+				rootCmd.logger.Debugf("--dry-run only not storing locally or remotely")
+				return nil
+			}
+
+			// set out name for single repo analysis
+			outName := fmt.Sprintf("current/%s.json", conf.SearchDirName)
+			// select storage adapter
+			sc, err := storage.ClientFactory(rootCmd.outputStorageConfig.Typ, rootCmd.outputStorageConfig.Destination)
+			if err != nil {
+				return err
+			}
+
+			storageUpldReq := &storage.StorageUploadRequest{
+				ContainerName: rootCmd.outputStorageConfig.TopLevelFolder,
+				BlobKey:       outName,
+				Destination:   filepath.Join(rootCmd.outputStorageConfig.Destination, rootCmd.outputStorageConfig.TopLevelFolder, outName),
+			}
+
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
+
+			return gendoc.CommitInterimState(ctx, sc, storageUpldReq)
+		},
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return setStorageLocation(inputLocation, outputLocation)
+			return rootCmd.setStorageLocation(rootCmd.rootFlags.inputLocation, rootCmd.rootFlags.outputLocation)
 		},
 	}
-)
 
-func init() {
-	singleCtxCmd.PersistentFlags().StringVarP(&businessDomain, "business-domain", "b", "", `businessDomain e.g. Warehouse Systems`)
-	singleCtxCmd.PersistentFlags().StringVarP(&boundedCtxDomain, "bounded-ctx", "c", "", `boundedCtxDomain`)
-	singleCtxCmd.PersistentFlags().StringVarP(&repoUrl, "repo", "r", "", `repoUrl`)
-	singleCtxCmd.PersistentFlags().StringVarP(&repoLang, "lang", "", "C#", `Main Language used in repo`)
-	singleCtxCmd.PersistentFlags().StringVarP(&serviceId, "service-id", "", "", `serviceId`)
-	singleCtxCmd.PersistentFlags().BoolVarP(&isService, "is-service", "s", false, `whether the repo is a service repo`)
-	AsyncAPIGenCmd.AddCommand(singleCtxCmd)
-}
-
-func singleCtxExecute(cmd *cobra.Command, args []string) error {
-
-	if verbose {
-		logger = log.New(os.Stdout, log.DebugLvl)
-	}
-
-	conf, cleanUp, err := config(inputLocationStorageConfig)
-	if err != nil {
-		return err
-	}
-
-	defer cleanUp()
-
-	files, err := fshelper.ListFiles(inputLocationStorageConfig.Destination)
-	if err != nil {
-		return err
-	}
-
-	gendoc := generate.New(conf, logger)
-
-	gendoc.LoadInputsFromFiles(files)
-
-	if err := gendoc.GenDocBlox(); err != nil {
-		return err
-	}
-
-	if dryRun {
-		logger.Debugf("--dry-run only not storing locally or remotely")
-		return nil
-	}
-
-	// set out name for single repo analysis
-	outName := fmt.Sprintf("current/%s.json", conf.SearchDirName)
-	// select storage adapter
-	sc, err := storage.ClientFactory(outputStorageConfig.Typ, outputStorageConfig.Destination)
-	if err != nil {
-		return err
-	}
-
-	storageUpldReq := &storage.StorageUploadRequest{ContainerName: outputStorageConfig.TopLevelFolder, BlobKey: outName, Destination: filepath.Join(outputStorageConfig.Destination, outputStorageConfig.TopLevelFolder, outName)}
-
-	ctx, cancel := context.WithCancel(cmd.Context())
-	defer cancel()
-
-	return gendoc.CommitInterimState(ctx, sc, storageUpldReq)
+	singleCtxCmd.PersistentFlags().StringVarP(&f.businessDomain, "business-domain", "b", "", `businessDomain e.g. Warehouse Systems`)
+	singleCtxCmd.PersistentFlags().StringVarP(&f.boundedCtxDomain, "bounded-ctx", "c", "", `boundedCtxDomain`)
+	singleCtxCmd.PersistentFlags().StringVarP(&f.repoUrl, "repo", "r", "", `repoUrl`)
+	singleCtxCmd.PersistentFlags().StringVarP(&f.repoLang, "lang", "", "C#", `Main Language used in repo`)
+	singleCtxCmd.PersistentFlags().StringVarP(&f.serviceId, "service-id", "", "", `serviceId`)
+	singleCtxCmd.PersistentFlags().BoolVarP(&f.isService, "is-service", "s", false, `whether the repo is a service repo`)
+	rootCmd.Cmd.AddCommand(singleCtxCmd)
 }
