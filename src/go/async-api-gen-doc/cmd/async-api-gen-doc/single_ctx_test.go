@@ -2,6 +2,7 @@ package asyncapigendoc_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -17,10 +18,12 @@ func Test_single_repo_Analyis_runs_ok(t *testing.T) {
 	searchParentDir := fmt.Sprintf("local://%s", fshelper.DebugDirHelper(t, baseDir, "cmd/async-api-gen-doc", "../../"))
 
 	t.Run("local output and is-service set", func(t *testing.T) {
-		cmd := asyncapigendoc.AsyncAPIGenCmd
+		cmd := asyncapigendoc.NewCmd(context.TODO())
+
 		b := new(bytes.Buffer)
-		cmd.SetArgs([]string{"single-context", "--verbose", "--input", searchParentDir, "--is-service", "--bounded-ctx", "s2s", "--business-domain", "domain"})
-		cmd.SetErr(b)
+		cmd.Cmd.SetArgs([]string{"single-context", "--verbose", "--input", searchParentDir, "--is-service", "--bounded-ctx", "s2s", "--business-domain", "domain"})
+		cmd.Cmd.SetErr(b)
+		cmd.WithCommands()
 		cmd.Execute()
 		out, err := io.ReadAll(b)
 		if err != nil {
@@ -32,10 +35,12 @@ func Test_single_repo_Analyis_runs_ok(t *testing.T) {
 	})
 
 	t.Run("dry-run service set", func(t *testing.T) {
-		cmd := asyncapigendoc.AsyncAPIGenCmd
+		cmd := asyncapigendoc.NewCmd(context.TODO())
+		cmd.WithCommands()
+
 		b := new(bytes.Buffer)
-		cmd.SetArgs([]string{"single-context", "--verbose", "--is-service", "-i", searchParentDir, "--dry-run"})
-		cmd.SetErr(b)
+		cmd.Cmd.SetArgs([]string{"single-context", "--verbose", "--is-service", "-i", searchParentDir, "--dry-run"})
+		cmd.Cmd.SetErr(b)
 		cmd.Execute()
 		out, err := io.ReadAll(b)
 		if err != nil {
@@ -48,10 +53,12 @@ func Test_single_repo_Analyis_runs_ok(t *testing.T) {
 	t.Run("local input and azblob output", func(t *testing.T) {
 		// uncomment this for local testing only
 		t.Skip()
-		cmd := asyncapigendoc.AsyncAPIGenCmd
+		cmd := asyncapigendoc.NewCmd(context.TODO())
+		cmd.WithCommands()
+
 		b := new(bytes.Buffer)
-		cmd.SetArgs([]string{"single-context", "--verbose", "--is-service", "-i", searchParentDir, "--bounded-ctx", "s2s", "--business-domain", "domain", "--output", "azblob://stdevsandboxeuwdev/interim"})
-		cmd.SetErr(b)
+		cmd.Cmd.SetArgs([]string{"single-context", "--verbose", "--is-service", "-i", searchParentDir, "--bounded-ctx", "s2s", "--business-domain", "domain", "--output", "azblob://stdevsandboxeuwdev/interim"})
+		cmd.Cmd.SetErr(b)
 		cmd.Execute()
 		out, err := io.ReadAll(b)
 		if err != nil {
@@ -83,9 +90,10 @@ func Test_Failures_on_incorrect_input(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			b := new(bytes.Buffer)
 
-			cmd := asyncapigendoc.AsyncAPIGenCmd
-			cmd.SetArgs(tt.flags)
-			cmd.SetErr(b)
+			cmd := asyncapigendoc.NewCmd(context.TODO())
+			cmd.WithCommands()
+			cmd.Cmd.SetArgs(tt.flags)
+			cmd.Cmd.SetErr(b)
 			err := cmd.Execute()
 			if err == nil {
 				t.Fatal("should have failed with error")

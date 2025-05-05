@@ -30,8 +30,7 @@ tasks:
       - test_prereq
     cmd: |
       set -exo pipefail
-      go test ./... -timeout 30s -v -mod=readonly -race -coverprofile=.coverage/out > .coverage/test.out
-      cat .coverage/test.out
+      go test ./... -timeout 30s -v -mod=readonly -race -coverprofile=.coverage/out | tee .coverage/test.out
   
   install:
     desc: Install dependencies
@@ -79,7 +78,7 @@ tasks:
       Generates all the binaries for the gendoc utility.
 
       can be called from inside CI like this:
-      
+
       `task async-api-generator:bin GIT_TAG=0.1.2 REVISION=$commit_sha`
     deps:
       - clean_go
